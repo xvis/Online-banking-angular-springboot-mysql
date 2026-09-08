@@ -3,22 +3,17 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME = 'online-banking'
-        DOCKER_IMAGE = 'xvishu/online-banking'
-        MAVEN_IMAGE = 'maven:3.9-eclipse-temurin-21'
+        DOCKER_IMAGE = "xvishu/online-banking"
     }
 
     stages {
 
-        stage('Initialize') {
+        stage('Init') {
             steps {
-                echo 'Initializing Jenkins CI Pipeline'
-
-                sh '''
-                    echo "Workspace: ${WORKSPACE}"
-                    echo "Build Number: ${BUILD_NUMBER}"
-                    docker --version
-                '''
+                echo "========================================"
+                echo "Online Banking CI Pipeline"
+                echo "Build Number: ${BUILD_NUMBER}"
+                echo "========================================"
             }
         }
 
@@ -35,10 +30,10 @@ pipeline {
 
                 sh '''
                     docker run --rm \
-                      --volumes-from nexaflow-jenkins \
-                      -w "${WORKSPACE}" \
-                      ${MAVEN_IMAGE} \
-                      mvn clean package
+                    --volumes-from nexaflow-jenkins \
+                    -w "$WORKSPACE" \
+                    maven:3.9-eclipse-temurin-21 \
+                    mvn clean package
                 '''
             }
         }
@@ -49,10 +44,10 @@ pipeline {
 
                 sh '''
                     docker build \
-                      -f Dockerfile.devops \
-                      -t ${DOCKER_IMAGE}:${BUILD_NUMBER} \
-                      -t ${DOCKER_IMAGE}:latest \
-                      .
+                    -f Dockerfile.devops \
+                    -t ${DOCKER_IMAGE}:${BUILD_NUMBER} \
+                    -t ${DOCKER_IMAGE}:latest \
+                    .
                 '''
             }
         }
@@ -69,7 +64,7 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                        echo "$DOCKER_PASSWORD" | \
+                        printf '%s' "$DOCKER_PASSWORD" | \
                         docker login \
                         --username "$DOCKER_USERNAME" \
                         --password-stdin
@@ -88,35 +83,21 @@ pipeline {
                 '''
             }
         }
-
     }
 
     post {
-
         success {
-            echo """
-=========================================
- CI PIPELINE SUCCESSFUL
-=========================================
-Application build : SUCCESS
-Docker build      : SUCCESS
-Docker push       : SUCCESS
-
-Image:
-${DOCKER_IMAGE}:${BUILD_NUMBER}
-${DOCKER_IMAGE}:latest
-=========================================
-"""
+            echo "========================================"
+            echo "CI PIPELINE SUCCESS"
+            echo "Docker Image: ${DOCKER_IMAGE}:${BUILD_NUMBER}"
+            echo "========================================"
         }
 
         failure {
-            echo '''
-=========================================
- CI PIPELINE FAILED
-=========================================
-Check the Jenkins console output.
-=========================================
-'''
+            echo "========================================"
+            echo "CI PIPELINE FAILED"
+            echo "Check the Jenkins console output."
+            echo "========================================"
         }
 
         always {
