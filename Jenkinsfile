@@ -24,6 +24,19 @@ pipeline {
             }
         }
 
+        stage('Set Image Tag') {
+            steps {
+                script {
+                    env.IMAGE_TAG = sh(
+                        script: 'git rev-parse --short=8 HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Docker Image Tag: ${IMAGE_TAG}"
+                }
+            }
+        }
+
         stage('Build & Test') {
             steps {
                 echo 'Running Maven build and tests...'
@@ -45,7 +58,7 @@ pipeline {
                 sh '''
                     docker build \
                     -f Dockerfile.devops \
-                    -t ${DOCKER_IMAGE}:${BUILD_NUMBER} \
+                    -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
                     -t ${DOCKER_IMAGE}:latest \
                     .
                 '''
@@ -78,7 +91,7 @@ pipeline {
                 echo 'Pushing Docker image to Docker Hub...'
 
                 sh '''
-                    docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                    docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
                     docker push ${DOCKER_IMAGE}:latest
                 '''
             }
@@ -89,7 +102,8 @@ pipeline {
         success {
             echo "========================================"
             echo "CI PIPELINE SUCCESS"
-            echo "Docker Image: ${DOCKER_IMAGE}:${BUILD_NUMBER}"
+            echo "Image: ${DOCKER_IMAGE}:${IMAGE_TAG}"
+            echo "Latest: ${DOCKER_IMAGE}:latest"
             echo "========================================"
         }
 
