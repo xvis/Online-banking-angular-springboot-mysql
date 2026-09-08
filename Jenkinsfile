@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         APP_NAME = 'online-banking'
-        DOCKER_IMAGE = 'online-banking'
+        DOCKER_IMAGE = 'xvishu/online-banking'
         MAVEN_IMAGE = 'maven:3.9-eclipse-temurin-21'
     }
 
@@ -12,9 +12,7 @@ pipeline {
 
         stage('Initialize') {
             steps {
-                echo '========================================='
                 echo 'Initializing Jenkins CI Pipeline'
-                echo '========================================='
 
                 sh '''
                     echo "Workspace: ${WORKSPACE}"
@@ -59,12 +57,34 @@ pipeline {
             }
         }
 
-        stage('Docker Image Test') {
+        stage('Docker Login') {
             steps {
-                echo 'Checking Docker image...'
+                echo 'Logging in to Docker Hub...'
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: '552968b7-7c07-451e-9d28-76e59c51329a',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | \
+                        docker login \
+                        --username "$DOCKER_USERNAME" \
+                        --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                echo 'Pushing Docker image to Docker Hub...'
 
                 sh '''
-                    docker images ${DOCKER_IMAGE}
+                    docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                    docker push ${DOCKER_IMAGE}:latest
                 '''
             }
         }
@@ -74,14 +94,19 @@ pipeline {
     post {
 
         success {
-            echo '''
+            echo """
 =========================================
  CI PIPELINE SUCCESSFUL
 =========================================
-Application build: SUCCESS
-Docker build:      SUCCESS
+Application build : SUCCESS
+Docker build      : SUCCESS
+Docker push       : SUCCESS
+
+Image:
+${DOCKER_IMAGE}:${BUILD_NUMBER}
+${DOCKER_IMAGE}:latest
 =========================================
-'''
+"""
         }
 
         failure {
