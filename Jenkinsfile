@@ -1,61 +1,101 @@
 pipeline {
+
     agent any
-    parameters {
-        string(name: 'MYSQL_ROOT_PASSWORD', defaultValue: 'root', description: 'MySQL password')
+
+    environment {
+        APP_NAME = 'online-banking'
+        DOCKER_IMAGE = 'online-banking'
+        MAVEN_IMAGE = 'maven:3.9-eclipse-temurin-21'
     }
+
     stages {
-        stage ("Initialize Jenkins Env") {
-         steps {
-            sh '''
-            echo "PATH = ${PATH}"
-            echo "M2_HOME = ${M2_HOME}"
-            '''
-         }
-        }
-        stage('Download Code') {
+
+        stage('Initialize') {
             steps {
-               echo 'checking out'
-               checkout scm
+                echo '========================================='
+                echo 'Initializing Jenkins CI Pipeline'
+                echo '========================================='
+
+                sh '''
+                    echo "Workspace: ${WORKSPACE}"
+                    echo "Build Number: ${BUILD_NUMBER}"
+                    docker --version
+                '''
             }
         }
-        stage('Execute Tests'){
+
+        stage('Checkout') {
             steps {
-                echo 'Testing'
-                sh 'mvn test'
+                echo 'Checking out source code...'
+                checkout scm
             }
         }
-        stage('Build Application'){
+
+        stage('Build & Test') {
             steps {
-                echo 'Building...'
-                sh 'mvn clean install -Dmaven.test.skip=true'
+                echo 'Running Maven build and tests...'
+
+                sh '''
+                    docker run --rm \
+                      --volumes-from nexaflow-jenkins \
+                      -w "${WORKSPACE}" \
+                      ${MAVEN_IMAGE} \
+                      mvn clean package
+                '''
             }
         }
+
         stage('Build Docker Image') {
             steps {
-                echo 'Building Docker image'
-                sh 'docker build -t hendisantika/online-banking:1 .'
+                echo 'Building Docker image...'
+
+                sh '''
+                    docker build \
+                      -f Dockerfile.devops \
+                      -t ${DOCKER_IMAGE}:${BUILD_NUMBER} \
+                      -t ${DOCKER_IMAGE}:latest \
+                      .
+                '''
             }
         }
-       stage('Create Database') {
+
+        stage('Docker Image Test') {
             steps {
-                echo 'Running Database Image'
-            //    sh 'docker kill bankmysql 2> /dev/null'
-            //    sh 'docker kill cloudbank 2> /dev/null'
-            //    sh 'docker rm bankmysql 2> /dev/null'
-            //    sh 'docker rm cloudbank 2> /dev/null'
-                sh 'docker stop bankmysql || true && docker rm bankmysql || true'
-                sh 'docker run --detach --name=bankmysql --env="MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}" -p 3306:3306 mysql'
-                sh 'sleep 20'
-            //  sh 'docker exec -i bankmysql mysql -uroot -proot < sql_dump/onlinebanking.sql'
-                sh 'docker exec -i bankmysql mysql -uroot -p${MYSQL_ROOT_PASSWORD} < sql_dump/onlinebanking.sql'
+                echo 'Checking Docker image...'
+
+                sh '''
+                    docker images ${DOCKER_IMAGE}
+                '''
             }
         }
-        stage('Deploy and Run') {
-            steps {
-                echo 'Running Application'
-                sh 'docker stop cloudbank || true && docker rm cloudbank || true'
-                sh 'docker run --detach --name=cloudbank -p 8888:8888 --link bankmysql:localhost -t hendisantika/online-banking:1'
-            }
+
+    }
+
+    post {
+
+        success {
+            echo '''
+=========================================
+ CI PIPELINE SUCCESSFUL
+=========================================
+Application build: SUCCESS
+Docker build:      SUCCESS
+=========================================
+'''
+        }
+
+        failure {
+            echo '''
+=========================================
+ CI PIPELINE FAILED
+=========================================
+Check the Jenkins console output.
+=========================================
+'''
+        }
+
+        always {
+            echo "Jenkins Build #${BUILD_NUMBER} completed."
         }
     }
 }
